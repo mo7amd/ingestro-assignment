@@ -383,7 +383,11 @@ function sortIds(ids: Uint32Array, column: Column, dir: 'asc' | 'desc'): Uint32A
   if (NUMBER_COLUMNS.has(column)) {
     // Sort by the cleaned number ("€ 68" → 68); unreadable values go last either way.
     const keys = new Float64Array(rowCount)
-    for (const id of ids) keys[id] = Number(checkCell(column, values[id], contextFor(id)).suggestion ?? values[id])
+    for (const id of ids) {
+      const raw = values[id]
+      // Blank is "no value", not 0: NaN sorts last like other unreadable values.
+      keys[id] = raw.trim() === '' ? NaN : Number(checkCell(column, raw, contextFor(id)).suggestion ?? raw)
+    }
     return ids.sort((a, b) => {
       const x = keys[a]
       const y = keys[b]

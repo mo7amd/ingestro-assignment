@@ -1,6 +1,7 @@
 import { Button, HStack, Input, NativeSelect, Text } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
 import { COLUMN_LABELS, COLUMNS, issueType, type Column } from '../../domain/config'
+import { uniqueRule } from '../../domain/validate'
 import { dataApi, type ValueCheck } from '../../worker/client'
 import { formatCount } from '../format'
 
@@ -34,6 +35,9 @@ export function SelectionBar({ rowIds, focusColumn, onFix, onSet, onClear, onMer
       live = false
     }
   }, [value, column, firstRow])
+
+  // One value on several rows of a unique column would create duplicates by definition.
+  const mustBeUnique = !!uniqueRule(column) && rowIds.length > 1
 
   return (
     <HStack
@@ -82,12 +86,23 @@ export function SelectionBar({ rowIds, focusColumn, onFix, onSet, onClear, onMer
         borderColor={check ? (check.issue ? 'orange.solid' : 'green.solid') : undefined}
         onChange={(e) => setValue(e.currentTarget.value)}
       />
-      {check?.issue && (
-        <Text color="orange.fg" maxW="48" truncate title={issueType(check.issue).explanation}>
-          ⚠ {issueType(check.issue).title}
+      {mustBeUnique ? (
+        <Text color="orange.fg" maxW="56" truncate>
+          ⚠ Each customer needs their own {COLUMN_LABELS[column].toLowerCase()}; edit these one at a time
         </Text>
+      ) : (
+        check?.issue && (
+          <Text color="orange.fg" maxW="48" truncate title={issueType(check.issue).explanation}>
+            ⚠ {issueType(check.issue).title}
+          </Text>
+        )
       )}
-      <Button size="xs" variant="outline" disabled={value === '' || !check || check.issue !== null} onClick={() => onSet(column, value)}>
+      <Button
+        size="xs"
+        variant="outline"
+        disabled={mustBeUnique || value === '' || !check || check.issue !== null}
+        onClick={() => onSet(column, value)}
+      >
         Set for {formatCount(rowIds.length)}
       </Button>
       <Button size="xs" variant="ghost" onClick={onClear}>
