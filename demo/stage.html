@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  Demo stage: the app on the left (in an iframe, untouched), a narration card on the right.
+  demo/record.mjs drives the app and calls window.setStep(...) / window.cursorTo(...).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ingestro demo</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --ink: #14171f;
+        --muted: #5b6372;
+        --accent: #2f6fed;
+        --line: #e3e6eb;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color: var(--ink); }
+      .stage { display: flex; height: 100vh; }
+      .app { flex: 1; position: relative; padding: 16px 0 16px 16px; }
+      .app iframe { width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 6px 24px rgba(20, 23, 31, 0.08); }
+      aside { width: 460px; flex-shrink: 0; padding: 40px 36px; display: flex; flex-direction: column; gap: 22px; }
+      .brand { font-weight: 700; letter-spacing: 0.02em; color: var(--muted); font-size: 14px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 6px 24px rgba(20, 23, 31, 0.06); transition: opacity 0.25s; }
+      .card.fade { opacity: 0; }
+      .kicker { font-size: 13px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+      h1 { margin: 0; font-size: 26px; line-height: 1.25; font-weight: 700; }
+      ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 17px; line-height: 1.45; }
+      .how { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; line-height: 1.5; }
+      .how b { color: var(--ink); font-weight: 600; }
+      .progress { display: flex; gap: 6px; margin-top: auto; }
+      .progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+      .progress span.on { background: var(--accent); }
+      /* Visible pointer: Playwright's video has no cursor of its own. */
+      #cursor { position: fixed; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(47, 111, 237, 0.25); border: 2px solid var(--accent); pointer-events: none; z-index: 10; transition: transform 0.45s cubic-bezier(0.3, 0.7, 0.4, 1); }
+      #cursor.click { animation: click 0.35s ease-out; }
+      @keyframes click { 0% { box-shadow: 0 0 0 0 rgba(47, 111, 237, 0.6); } 100% { box-shadow: 0 0 0 18px rgba(47, 111, 237, 0); } }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="app"><iframe id="app" title="Ingestro app"></iframe></div>
+      <aside>
+        <div class="brand">INGESTRO · review &amp; fix demo</div>
+        <div class="card" id="card">
+          <div class="kicker" id="kicker"></div>
+          <h1 id="title"></h1>
+          <ul id="bullets"></ul>
+          <div class="how" id="how"></div>
+        </div>
+        <div class="progress" id="progress"></div>
+      </aside>
+    </div>
+    <div id="cursor" style="transform: translate(-100px, -100px)"></div>
+    <script>
+      const $ = (id) => document.getElementById(id)
+      window.setStep = ({ kicker, title, bullets = [], how = '', index, total }) => {
+        const card = $('card')
+        card.classList.add('fade')
+        setTimeout(() => {
+          $('kicker').textContent = kicker
+          $('title').textContent = title
+          $('bullets').innerHTML = bullets.map((b) => `<li>${b}</li>`).join('')
+          $('how').innerHTML = how
+          $('how').style.display = how ? '' : 'none'
+          $('progress').innerHTML = Array.from({ length: total }, (_, i) => `<span class="${i <= index ? 'on' : ''}"></span>`).join('')
+          card.classList.remove('fade')
+        }, 200)
+      }
+      window.cursorTo = (x, y) => ($('cursor').style.transform = `translate(${x}px, ${y}px)`)
+      window.cursorClick = () => {
+        const c = $('cursor')
+        c.classList.remove('click')
+        void c.offsetWidth
+        c.classList.add('click')
+      }
+    </script>
+  </body>
+</html>

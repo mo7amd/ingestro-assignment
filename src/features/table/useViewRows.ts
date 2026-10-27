@@ -17,7 +17,11 @@ export function useViewRows(query: ViewQuery, dataVersion: number) {
   const pages = useRef(new Map<number, RowSlice[]>())
   const stale = useRef(new Set<number>())
   const pending = useRef(new Set<number>())
+  /** Bumped by a new view: answers for an older view are dropped. */
+  const viewGen = useRef(0)
+  /** Bumped by a new view or a data change: page answers from before are dropped. */
   const generation = useRef(0)
+  const seenVersion = useRef(dataVersion)
   const lastRange = useRef<[number, number]>([0, 0])
   const key = JSON.stringify(query)
 
@@ -38,19 +42,22 @@ export function useViewRows(query: ViewQuery, dataVersion: number) {
 
   // New view: drop everything and ask the worker for it.
   useEffect(() => {
-    const gen = ++generation.current
+    const gen = ++viewGen.current
+    generation.current++
     pages.current = new Map()
     stale.current = new Set()
     pending.current = new Set()
     setInfo(null)
     dataApi.setView(JSON.parse(key) as ViewQuery).then((i) => {
-      if (gen === generation.current) setInfo(i)
+      if (gen === viewGen.current) setInfo(i)
     })
   }, [key])
 
   // Data changed: same view, fresh values.
   useEffect(() => {
-    if (dataVersion === 0) return
+    // Only real changes after mount; a fresh view already reads fresh data.
+    if (dataVersion === seenVersion.current) return
+    seenVersion.current = dataVersion
     generation.current++
     pending.current = new Set()
     stale.current = new Set(pages.current.keys())
