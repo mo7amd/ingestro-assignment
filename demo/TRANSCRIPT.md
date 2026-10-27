@@ -6,6 +6,8 @@ One block per chapter tag. Pause the video at each tag and read the block.
 
 ## Intro
 
+Hi, I'm Mohammed, based in Berlin. This is a short walkthrough of my home assignment.
+
 This is a review-and-fix flow for a 200,000-row customer file, built for non-technical users. I focused on three things: keeping the browser responsive, showing one problem at a time, and making every change reversible.
 
 ---
