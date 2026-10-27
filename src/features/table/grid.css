@@ -1,0 +1,42 @@
+/* Plain CSS for the grid: Chakra components per cell would be too heavy while scrolling. */
+.grid:focus { outline: none; }
+.grid { --row-h: 36px; border: 1px solid var(--chakra-colors-border); border-radius: 8px; overflow: auto; font-size: 14px; background: var(--chakra-colors-bg); }
+.grid-row { display: grid; height: var(--row-h); align-items: center; border-bottom: 1px solid var(--chakra-colors-border-subtle, #eee); }
+.grid-row.head { position: sticky; top: 0; z-index: 1; background: var(--chakra-colors-bg-subtle); font-weight: 600; }
+.grid-row.body { position: absolute; left: 0; width: 100%; cursor: pointer; }
+.grid-row.body:hover { background: var(--chakra-colors-bg-subtle); }
+.grid-row.selected { background: var(--chakra-colors-blue-subtle) !important; }
+.cell { padding: 0 10px; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.cell.num { color: var(--chakra-colors-fg-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.head .cell.sortable { cursor: pointer; user-select: none; }
+.head .cell.sortable:hover { color: var(--chakra-colors-blue-fg); }
+.head .cell.focus { color: var(--chakra-colors-orange-fg); }
+/* Focus mode highlights only the issue in hand; the all-rows views highlight every issue. */
+.cell.issue { background: var(--chakra-colors-orange-subtle); height: 100%; display: flex; align-items: center; gap: 6px; }
+.cell .value { overflow: hidden; text-overflow: ellipsis; }
+/* The suggested fix is a button: one click applies it. */
+.cell .fix { flex-shrink: 0; color: var(--chakra-colors-blue-fg); font-size: 12px; background: none; border: 0; padding: 1px 4px; border-radius: 4px; cursor: pointer; font-family: inherit; }
+.cell .fix:hover { background: var(--chakra-colors-blue-subtle); }
+/* Changed by the user: a small corner dot (the details panel says what it was). */
+.cell { position: relative; display: flex; align-items: center; height: 100%; }
+.cell.num { justify-content: flex-end; }
+.cell.active { box-shadow: inset 0 0 0 2px var(--chakra-colors-blue-solid); overflow: visible; }
+.grid-row.cursor { background: var(--chakra-colors-bg-subtle); }
+/* Small card under a cell: live check while editing, "was X · undo" on a changed cell. Only while that cell is in use. */
+.cell-pop.left { left: auto; right: 0; }
+.cell-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; width: 300px; padding: 10px 12px; border-radius: 8px; white-space: normal; font-size: 13px; line-height: 1.4; cursor: auto; background: var(--chakra-colors-bg-panel); border: 1px solid var(--chakra-colors-border); box-shadow: var(--chakra-shadows-lg); }
+.cell.changed::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 3px; background: var(--chakra-colors-blue-solid); }
+.cell.editing { padding: 2px 4px; overflow: visible; }
+.cell.editing input { width: 100%; height: 100%; font: inherit; padding: 0 6px; border-radius: 4px; outline: none; border: 2px solid var(--chakra-colors-blue-solid); background: var(--chakra-colors-bg); }
+.cell.editing input.bad { border-color: var(--chakra-colors-orange-solid); }
+.cell.editing input.good { border-color: var(--chakra-colors-green-solid); }
+.dot { display: inline-flex; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 600; align-items: center; justify-content: center; background: var(--chakra-colors-orange-subtle); color: var(--chakra-colors-orange-fg); }
+.placeholder { color: var(--chakra-colors-fg-subtle); }
+
+/* Duplicate views: groups are separated by a line; actions appear on the row you're on. */
+.grid-row.group-start { border-top: 2px solid var(--chakra-colors-border-emphasized); }
+.cell .cta { display: none; flex-shrink: 0; margin-left: auto; gap: 2px; }
+.grid-row:hover .cell .cta, .grid-row.cursor .cell .cta { display: inline-flex; }
+.grid-row.removed { color: var(--chakra-colors-fg-subtle); cursor: default; }
+.grid-row.removed .value { text-decoration: line-through; }
+.removed-note { font-size: 12px; font-style: italic; }

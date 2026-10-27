@@ -1,0 +1,143 @@
+{
+  "columns": [
+    {
+      "key": "customer_id",
+      "label": "Customer ID",
+      "searchAs": ["id", "customer"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "ID_MISSING" } },
+        { "type": "unique", "match": "exact", "issues": { "duplicate": "ID_DUPLICATE" } }
+      ]
+    },
+    {
+      "key": "first_name",
+      "label": "First name",
+      "searchAs": ["first", "firstname"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "FIRST_NAME_MISSING" } },
+        { "type": "trimmed", "issues": { "format": "FIRST_NAME_SPACES" } }
+      ]
+    },
+    {
+      "key": "last_name",
+      "label": "Last name",
+      "searchAs": ["last", "lastname", "surname"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "LAST_NAME_MISSING" } },
+        { "type": "trimmed", "issues": { "format": "LAST_NAME_SPACES" } }
+      ]
+    },
+    {
+      "key": "email",
+      "label": "Email",
+      "width": 260,
+      "searchAs": ["mail"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "EMAIL_MISSING" } },
+        { "type": "pattern", "regex": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", "issues": { "invalid": "EMAIL_INVALID" } },
+        { "type": "unique", "match": "ignore-case", "issues": { "duplicate": "EMAIL_DUPLICATE" } }
+      ]
+    },
+    {
+      "key": "signup_date",
+      "label": "Sign-up date",
+      "searchAs": ["date", "signup"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "DATE_MISSING" } },
+        {
+          "type": "date",
+          "target": "YYYY-MM-DD",
+          "accept": ["DD/MM/YYYY", "MM/DD/YYYY", "D MMM YYYY"],
+          "ambiguous": {
+            "decide": "from-file",
+            "fallback": { "column": "country", "when": { "US": "MM/DD/YYYY" }, "otherwise": "DD/MM/YYYY" }
+          },
+          "issues": { "format": "DATE_FORMAT", "notReal": "DATE_NOT_REAL", "unreadable": "DATE_UNREADABLE" }
+        }
+      ]
+    },
+    {
+      "key": "country",
+      "label": "Country",
+      "searchAs": [],
+      "checks": [
+        { "type": "required", "issues": { "missing": "COUNTRY_MISSING" } },
+        {
+          "type": "oneOf",
+          "values": ["DE", "FR", "GB", "IT", "NL", "ES", "PL", "US"],
+          "aliases": {
+            "DE": ["germany", "deutschland"],
+            "FR": ["france"],
+            "GB": ["uk", "united kingdom", "great britain", "britain"],
+            "IT": ["italy", "italia"],
+            "NL": ["netherlands", "the netherlands", "nederland", "holland"],
+            "ES": ["spain", "espana"],
+            "PL": ["poland", "polska"],
+            "US": ["usa", "us", "united states", "united states of america", "america"]
+          },
+          "issues": { "format": "COUNTRY_FORMAT", "unknown": "COUNTRY_UNKNOWN" }
+        }
+      ]
+    },
+    {
+      "key": "plan",
+      "label": "Plan",
+      "width": 100,
+      "searchAs": [],
+      "checks": [
+        { "type": "required", "issues": { "missing": "PLAN_MISSING" } },
+        {
+          "type": "oneOf",
+          "values": ["free", "pro", "enterprise"],
+          "issues": { "format": "PLAN_FORMAT", "unknown": "PLAN_UNKNOWN" }
+        }
+      ]
+    },
+    {
+      "key": "monthly_spend",
+      "label": "Monthly spend",
+      "searchAs": ["spend", "amount"],
+      "checks": [
+        { "type": "required", "issues": { "missing": "SPEND_MISSING" } },
+        {
+          "type": "number",
+          "min": 0,
+          "strip": ["€", "$", "£", "EUR", "USD", "GBP"],
+          "issues": { "format": "SPEND_FORMAT", "notNumber": "SPEND_NOT_NUMBER", "belowMin": "SPEND_NEGATIVE" }
+        }
+      ]
+    }
+  ],
+
+  "issues": {
+    "ID_MISSING": { "title": "Missing customer ID", "explanation": "Every customer needs an ID so records can be told apart.", "example": "C-0000123" },
+    "ID_DUPLICATE": { "title": "Customer ID used twice", "explanation": "Two or more rows share one ID. Each customer needs their own.", "example": "C-0000123 (only once)" },
+
+    "FIRST_NAME_MISSING": { "title": "Missing first name", "explanation": "The first name is empty.", "example": "Anna" },
+    "FIRST_NAME_SPACES": { "title": "Extra spaces in first name", "explanation": "There are spaces before or after the name. We remove them.", "example": "' Anna  ' → 'Anna'", "fixable": true },
+    "LAST_NAME_MISSING": { "title": "Missing last name", "explanation": "The last name is empty.", "example": "Schmidt" },
+    "LAST_NAME_SPACES": { "title": "Extra spaces in last name", "explanation": "There are spaces before or after the name. We remove them.", "example": "' Schmidt ' → 'Schmidt'", "fixable": true },
+
+    "EMAIL_MISSING": { "title": "Missing email", "explanation": "The email is empty, so this customer can't be contacted.", "example": "anna.schmidt@example.com" },
+    "EMAIL_INVALID": { "title": "Email doesn't look right", "explanation": "It is missing an '@' or the part after it, like '.com'.", "example": "anna.schmidt@example.com" },
+    "EMAIL_DUPLICATE": { "title": "Email shared by several customers", "explanation": "These rows use the same email (capital letters ignored). Merge them if they are one person, or correct the email.", "example": "One email per customer" },
+
+    "DATE_MISSING": { "title": "Missing sign-up date", "explanation": "The date the customer signed up is empty.", "example": "2024-04-03" },
+    "DATE_NOT_REAL": { "title": "Sign-up date doesn't exist", "explanation": "This day is not on the calendar, like 30 February, so we can't guess what was meant.", "example": "2024-02-28" },
+    "DATE_UNREADABLE": { "title": "Sign-up date can't be read", "explanation": "We could not recognise this as a date.", "example": "2024-04-03" },
+    "DATE_FORMAT": { "title": "Date in another format", "explanation": "Dates should be written year-month-day. We rewrite them for you.", "example": "'03/04/2024' or '3 Apr 2024' → '2024-04-03'", "fixable": true },
+
+    "COUNTRY_MISSING": { "title": "Missing country", "explanation": "The country is empty.", "example": "DE" },
+    "COUNTRY_UNKNOWN": { "title": "Unknown country", "explanation": "We could not match this to a country. Please choose the right one.", "example": "DE" },
+    "COUNTRY_FORMAT": { "title": "Country not a 2-letter code", "explanation": "Countries are written as a 2-letter code (ISO 3166). We recognise names, other spellings and lower case, and swap in the code.", "example": "'Deutschland', 'germany', 'de' → 'DE'", "fixable": true },
+
+    "PLAN_MISSING": { "title": "Missing plan", "explanation": "Each customer should be on free, pro or enterprise.", "example": "pro" },
+    "PLAN_UNKNOWN": { "title": "Unknown plan", "explanation": "The plan must be free, pro or enterprise. Please pick the right one.", "example": "'enterprize' → 'enterprise'" },
+    "PLAN_FORMAT": { "title": "Plan in capitals or with spaces", "explanation": "Plans are written in small letters without extra spaces. We tidy them up.", "example": "'PRO' → 'pro'", "fixable": true },
+
+    "SPEND_MISSING": { "title": "Missing monthly spend", "explanation": "The monthly spend is empty. Use 0 if the customer pays nothing.", "example": "49.50" },
+    "SPEND_NOT_NUMBER": { "title": "Spend isn't a number", "explanation": "We need an amount here, like 49.50 or 0. Words like 'TBD' can't be used.", "example": "49.50" },
+    "SPEND_NEGATIVE": { "title": "Spend below zero", "explanation": "A customer can't spend a negative amount. Please check the value.", "example": "49.50" },
+    "SPEND_FORMAT": { "title": "Spend with currency or comma", "explanation": "Amounts are just the number, with a dot for cents. We remove the currency and fix the separators.", "example": "'€ 1,234.50' or '0,50' → '1234.50' / '0.50'", "fixable": true }
+  }
+}
