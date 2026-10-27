@@ -16,7 +16,6 @@
     "@emotion/react": "^11.14.0",
     "@tanstack/react-virtual": "^3.14.23",
     "comlink": "^4.4.2",
-    "idb": "^8.0.4",
     "papaparse": "^5.7.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

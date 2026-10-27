@@ -3,6 +3,8 @@ import { formatCount } from '../format'
 
 interface Props {
   count: number
+  /** the view is still being built */
+  busy?: boolean
   visible: [number, number]
   /** position of the active row, if any */
   active: number | null
@@ -12,12 +14,12 @@ interface Props {
 }
 
 /** Under the table: where you are, and step through the list row by row. */
-export function TableFooter({ count, visible, active, group, onGoTo }: Props) {
+export function TableFooter({ count, busy, visible, active, group, onGoTo }: Props) {
   const [first, last] = visible
   return (
     <HStack justify="space-between" fontSize="sm" color="fg.muted">
       <Text>
-        {count === 0 ? 'No rows' : `Rows ${formatCount(first + 1)}–${formatCount(Math.min(last + 1, count))} of ${formatCount(count)}`}
+        {busy ? 'Working…' : count === 0 ? 'No rows' : `Rows ${formatCount(first + 1)}–${formatCount(Math.min(last + 1, count))} of ${formatCount(count)}`}
         {group && ` · Group ${formatCount(group.ordinal)} of ${formatCount(group.total)}`}
       </Text>
       <HStack gap="2">

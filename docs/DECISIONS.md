@@ -34,7 +34,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Context:** The user wants minimal frameworks but not hand-written CSS for everything. Chakra UI has no virtualized table.
 - **Decision:**
   - The grid is a custom grid on `@tanstack/react-virtual`: headless, about 10KB, and we fully control cell rendering for issue badges and inline editors.
-  - Chakra UI handles the shell: issues panel, dialogs, bulk-fix preview and toasts.
+  - Chakra UI handles the shell: issues panel, dialogs, bulk-fix preview and toasts. *(As built: dialogs, popovers and the toolbar; no side panel (D21) and no toasts.)*
 - **Alternatives:**
   - *AG Grid Community:* full-featured but heavy, and harder to fit our issue-first UX.
   - *Glide Data Grid:* canvas, very fast, has built-in editing, but custom tooltips and explanations are harder.

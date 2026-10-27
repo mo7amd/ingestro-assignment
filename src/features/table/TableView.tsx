@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Input, NativeSelect, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, HStack, Input, NativeSelect, Spinner, Stack, Text } from '@chakra-ui/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { navigate, type Route } from '../../app/router'
 import { COLUMN_LABELS, issueType, type Column, type IssueCode } from '../../domain/config'
@@ -305,6 +305,14 @@ function Table({ query, route, history, focusColumn, duplicateColumn }: TablePro
         </Text>
       )}
       <Box flex="1" minH="0" position="relative">
+        {!info && (
+          // The worker is building the view; sorting all 200k rows takes a moment.
+          <HStack position="absolute" top="12" left="50%" transform="translateX(-50%)" zIndex="2" px="4" py="2"
+            bg="bg.muted" borderWidth="1px" borderRadius="md" fontSize="sm" color="fg.muted" gap="2">
+            <Spinner size="xs" />
+            <Text>{route.sort ? `Sorting by ${COLUMN_LABELS[route.sort.column].toLowerCase()}…` : 'Updating the list…'}</Text>
+          </HStack>
+        )}
         <DataGrid
           count={count}
           getRow={getRow}
@@ -345,6 +353,7 @@ function Table({ query, route, history, focusColumn, duplicateColumn }: TablePro
         )}
       </Box>
       <TableFooter
+        busy={!info}
         count={count}
         visible={visible}
         active={active?.index ?? null}

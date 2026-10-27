@@ -1,13 +1,18 @@
 /**
- * Records a narrated demo of the app: `npm run demo` → demo/output/ingestro-demo.webm
+ * Records a narrated demo of the app: `npm run demo` → demo/output/ingestro-demo.mp4
  *
- * Starts its own Vite dev server, opens demo/stage.html (app on the left, narration card
- * on the right) and walks through the flows from the user's point of view. Brisk on purpose:
- * pause the video while you talk.
+ * Starts its own Vite dev server and drives the app full screen from the user's point of view.
+ * A small chapter tag marks each step (your cue to pause and talk; see demo/TRANSCRIPT.md).
+ *
+ * Quality: Playwright's built-in recorder uses a low, fixed bitrate. Instead, frames come
+ * straight from Chrome (DevTools screencast) at 2× pixel density and are encoded with ffmpeg:
+ * H.264 .mp4 when a full ffmpeg is installed, otherwise VP9 .webm with Playwright's ffmpeg.
  *
  * Needs import-data.csv in the repo root (`npm run generate`).
  */
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -16,7 +21,9 @@ import { createServer } from 'vite'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CSV = join(ROOT, 'import-data.csv')
 const OUT = join(ROOT, 'demo', 'output')
-const SIZE = { width: 1920, height: 1080 }
+const FRAMES = join(OUT, 'frames')
+const VIEWPORT = { width: 1600, height: 900 } // rendered at 2× → 3200×1800, encoded at 2560×1440
+const OUTPUT = { width: 2560, height: 1440 }
 const PORT = 5199
 
 // Brisk pacing (ms).
@@ -30,82 +37,52 @@ if (!existsSync(CSV)) {
 }
 
 // ---------- the story ----------
-// Every chapter starts from what the user wants, then what the app does, then (small) how.
+// One tag per step: where we are, and what the user wants. The talking is in TRANSCRIPT.md.
 
 const STEPS = [
   {
     kicker: 'The situation',
     title: '“I have to import 200,000 customers, and the file is a mess.”',
-    bullets: ['Too big to read, full of problems', 'No idea what “ISO 3166” means', 'Needs to be right before it goes in'],
   },
   {
     kicker: '1 · Load',
     title: '“I drop the file in.”',
-    bullets: ['Read and checked in about a second', 'The page never freezes', 'The file on disk is never changed'],
-    how: '<b>Under the hood:</b> parsing and every check run in a Web Worker; the page only gets a summary.',
   },
   {
     kicker: '2 · Overview',
     title: '“Where do I stand?”',
-    bullets: [
-      'One bar: <b>good</b> · <b>we can fix it</b> · <b>needs you</b>',
-      'Problems as cards, biggest first',
-      'Fixable ones first: early, big wins',
-    ],
-    how: '<b>Why:</b> one bulk fix clears most of the problems, so it leads.',
   },
   {
     kicker: '3 · Understand',
     title: '“What’s wrong with the countries?”',
-    bullets: ['Open a card: only that problem is highlighted', 'The <b>!</b> explains it in plain words', 'Each cell shows the fix it would make'],
-    how: '<b>Why:</b> no wall of red; one problem at a time.',
   },
   {
     kicker: '4 · Fix one',
     title: '“This one is easy, just fix it.”',
-    bullets: ['Click the suggestion in the cell', 'A blue dot marks what you changed', 'Changed your mind? Undo just that cell'],
   },
   {
     kicker: '5 · Correct by hand',
     title: '“30 February? That date doesn’t exist.”',
-    bullets: ['Double-click to edit in place', 'Checked as you type, in plain words', 'Enter saves, Esc cancels'],
-    how: '<b>Same rules</b> as the import check, run live in the worker.',
   },
   {
     kicker: '6 · Fix in bulk',
     title: '“Fix all the country spellings, but let me check first.”',
-    bullets: ['Every change grouped by value, with counts', 'Untick anything you’re unsure about', 'One click applies; one undo reverts it all'],
   },
   {
     kicker: '7 · Find & decide',
     title: '“These unknown plans are typos of enterprise.”',
-    bullets: [
-      'Search one column: <b>plan:enterprize</b>',
-      'Sort, select with click and Shift+↓',
-      'Set one value for all selected rows',
-    ],
-    how: '<b>Shareable:</b> filter, search and sort live in the URL.',
   },
   {
     kicker: '8 · Duplicates',
     title: '“Two customers share one email.”',
-    bullets: ['Rows of a group sit together', '<b>Fix</b>: give the other person their own email', '<b>Merge…</b>: same person, pick the values to keep'],
-    how: '<b>Safe:</b> merged rows stay visible, struck through; undo brings them back.',
   },
   {
     kicker: '9 · Finish',
     title: '“Fix everything that’s safe, then give me the file.”',
-    bullets: ['Review & apply all automatic fixes', 'The bar shows what’s left', 'Download a fixed copy of the file'],
   },
   {
     kicker: 'Recap',
     title: 'Find it, understand it, fix it, with confidence.',
-    bullets: [
-      'Fast: 200k rows, worker + virtual grid',
-      'Clear: one problem at a time, plain words',
-      'Safe: preview, undo, nothing silent',
-      'Rules are configuration, not code',
-    ],
   },
 ]
 
@@ -116,72 +93,103 @@ await server.listen()
 const BASE = `http://localhost:${PORT}`
 
 rmSync(OUT, { recursive: true, force: true })
-mkdirSync(OUT, { recursive: true })
+mkdirSync(FRAMES, { recursive: true })
 
 const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: SIZE, recordVideo: { dir: OUT, size: SIZE }, acceptDownloads: true })
+const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, acceptDownloads: true })
 const page = await context.newPage()
-await page.goto(`${BASE}/demo/stage.html`)
-const app = page.frameLocator('#app')
+const app = page
+
+// Demo overlay in every page: a visible cursor and the chapter tag. Never takes pointer events.
+await context.addInitScript(() => {
+  const ACCENT = '236,135,67'
+  addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style')
+    style.textContent = `
+      #demo-cursor { position: fixed; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+        background: rgba(${ACCENT},.2); border: 2.5px solid rgb(${ACCENT}); pointer-events: none; z-index: 2147483647;
+        transition: transform .45s cubic-bezier(.3,.7,.4,1); }
+      #demo-cursor.click { animation: demo-click .35s ease-out; }
+      @keyframes demo-click { 0% { box-shadow: 0 0 0 0 rgba(${ACCENT},.6) } 100% { box-shadow: 0 0 0 22px rgba(${ACCENT},0) } }
+      #demo-tag { position: fixed; top: 14px; left: 50%; transform: translate(-50%, -8px); opacity: 0; pointer-events: none; z-index: 2147483646;
+        display: flex; align-items: baseline; gap: 12px; padding: 10px 18px; border-radius: 8px; max-width: 70vw;
+        background: #3a3935; border: 1px solid #59564c; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+        font: 500 16px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color: #ede1bb;
+        transition: opacity .2s ease, transform .2s ease; }
+      #demo-tag.on { opacity: 1; transform: translate(-50%, 0); }
+      #demo-tag b { color: #f3c8a4; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }`
+    document.head.append(style)
+    const cursor = Object.assign(document.createElement('div'), { id: 'demo-cursor' })
+    cursor.style.transform = 'translate(-100px, -100px)'
+    const tag = Object.assign(document.createElement('div'), { id: 'demo-tag' })
+    document.body.append(cursor, tag)
+    let hide
+    window.__demo = {
+      move: (x, y) => (cursor.style.transform = `translate(${x}px, ${y}px)`),
+      click: () => {
+        cursor.classList.remove('click')
+        void cursor.offsetWidth
+        cursor.classList.add('click')
+      },
+      tag: (kicker, title, ms) => {
+        clearTimeout(hide)
+        tag.innerHTML = `<b>${kicker}</b><span>${title}</span>`
+        tag.classList.add('on')
+        hide = setTimeout(() => tag.classList.remove('on'), ms)
+      },
+    }
+  })
+})
+
+// ---------- capture: frames from Chrome at 2× ----------
+
+const cdp = await context.newCDPSession(page)
+const frames = [] // { file, t } with t in seconds
+cdp.on('Page.screencastFrame', async ({ data, metadata, sessionId }) => {
+  const file = join(FRAMES, `${String(frames.length).padStart(6, '0')}.jpg`)
+  writeFileSync(file, Buffer.from(data, 'base64'))
+  frames.push({ file, t: metadata.timestamp })
+  await cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {})
+})
+async function startCapture() {
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, maxWidth: 3200, maxHeight: 1800, everyNthFrame: 1 })
+}
+async function stopCapture() {
+  await cdp.send('Page.stopScreencast').catch(() => {})
+}
 
 const wait = (ms) => page.waitForTimeout(ms)
 let stepIndex = -1
-async function step() {
+/** Next chapter: show its tag, give it a moment. */
+async function step(hold = READ + 600) {
   stepIndex++
-  await page.evaluate((s) => window.setStep(s), { ...STEPS[stepIndex], index: stepIndex, total: STEPS.length })
+  const { kicker, title } = STEPS[stepIndex]
+  await page.evaluate(([k, t, ms]) => window.__demo.tag(k, t, ms), [kicker, title, hold])
   await wait(READ)
 }
 
-/**
- * The visible cursor lives inside the app frame, so it tilts and scales with the app.
- * Clicks are dispatched inside the frame: Playwright's pointer coordinates don't follow the
- * stage's 3D transform, so a real mouse click would land in the wrong place.
- */
-let frame
-async function installCursor() {
-  frame = await (await page.$('#app')).contentFrame()
-  await frame.evaluate(() => {
-    const style = document.createElement('style')
-    style.textContent = `
-      #demo-cursor { position: fixed; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
-        background: rgba(236,135,67,.22); border: 3px solid #ec8743; pointer-events: none; z-index: 2147483647;
-        transition: transform .45s cubic-bezier(.3,.7,.4,1); }
-      #demo-cursor.click { animation: demo-click .35s ease-out; }
-      @keyframes demo-click { 0% { box-shadow: 0 0 0 0 rgba(236,135,67,.6) } 100% { box-shadow: 0 0 0 24px rgba(236,135,67,0) } }`
-    document.head.append(style)
-    const c = document.createElement('div')
-    c.id = 'demo-cursor'
-    c.style.transform = 'translate(-100px, -100px)'
-    document.body.append(c)
-  })
-}
-
-/** Glide the visible cursor to an element's centre. */
+/** Glide the visible cursor (and the real mouse, for hover) to an element's centre. */
 async function pointAt(locator) {
   await locator.scrollIntoViewIfNeeded()
-  const { x, y } = await locator.evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
-  })
-  await frame.evaluate(([cx, cy]) => (document.getElementById('demo-cursor').style.transform = `translate(${cx}px, ${cy}px)`), [x, y])
-  await wait(450)
+  const box = await locator.boundingBox()
+  if (!box) throw new Error('element not visible')
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  await page.evaluate(([cx, cy]) => window.__demo.move(cx, cy), [x, y])
+  await page.mouse.move(x, y, { steps: 10 })
+  await wait(420)
 }
 
 async function click(locator) {
   await pointAt(locator)
-  await frame.evaluate(() => {
-    const c = document.getElementById('demo-cursor')
-    c.classList.remove('click')
-    void c.offsetWidth
-    c.classList.add('click')
-  })
-  await locator.evaluate((el) => el.click())
+  await page.evaluate(() => window.__demo.click())
+  await locator.click()
   await wait(BEAT)
 }
 
 async function dblclick(locator) {
   await pointAt(locator)
-  await locator.evaluate((el) => el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))
+  await locator.dblclick()
   await wait(BEAT)
 }
 
@@ -197,12 +205,11 @@ const filterSelect = () => app.locator('select').first()
 // ---------- the run ----------
 
 try {
-  await page.evaluate((src) => (document.getElementById('app').src = src), `${BASE}/dashboard`)
+  await page.goto(`${BASE}/dashboard`)
   await app.getByText('Drop your customer file here').waitFor()
-  await installCursor()
+  await startCapture()
 
-  await step() // situation
-  await wait(LONG)
+  await step(LONG) // situation
 
   await step() // load
   await pointAt(app.getByText('Drop your customer file here'))
@@ -322,23 +329,55 @@ try {
   await download
   await wait(READ)
 
-  await step() // recap
+  await step(LONG) // recap
   await wait(LONG)
 } catch (e) {
   await page.screenshot({ path: join(OUT, 'failure.png') })
+  await stopCapture()
   console.error(e)
   await browser.close()
   await server.close()
   process.exit(1)
 }
 
-// ---------- save ----------
+// ---------- save: encode the frames ----------
 
-await context.close() // flushes the video
+await stopCapture()
+await context.close()
 await browser.close()
 await server.close()
 
-const video = readdirSync(OUT).find((f) => f.endsWith('.webm'))
-const target = join(OUT, 'ingestro-demo.webm')
-renameSync(join(OUT, video), target)
-console.log(`Saved ${target}`)
+/** A full ffmpeg with H.264 if installed, else Playwright's bundled one (VP9 only). */
+function findFfmpeg() {
+  const candidates = ['ffmpeg', '/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg']
+  for (const bin of candidates) {
+    try {
+      if (execFileSync(bin, ['-hide_banner', '-encoders'], { encoding: 'utf8' }).includes('libx264')) return { bin, h264: true }
+    } catch {
+      /* not this one */
+    }
+  }
+  const dir = join(homedir(), 'Library', 'Caches', 'ms-playwright')
+  const bundled = readdirSync(dir).filter((d) => d.startsWith('ffmpeg')).map((d) => join(dir, d))
+  const bin = bundled.flatMap((d) => readdirSync(d).filter((f) => f.startsWith('ffmpeg')).map((f) => join(d, f)))[0]
+  return { bin, h264: false }
+}
+
+// Screencast frames arrive only when something changes: give each one its real on-screen time.
+const list = frames
+  .map((f, i) => `file '${f.file}'\nduration ${(((frames[i + 1]?.t ?? f.t + 1) - f.t) || 0.001).toFixed(4)}`)
+  .join('\n')
+writeFileSync(join(OUT, 'frames.txt'), `${list}\nfile '${frames[frames.length - 1].file}'\n`)
+
+const { bin, h264 } = findFfmpeg()
+const target = join(OUT, h264 ? 'ingestro-demo.mp4' : 'ingestro-demo.webm')
+const filters = `fps=30,scale=${OUTPUT.width}:${OUTPUT.height}:flags=lanczos,format=yuv420p`
+const codec = h264
+  ? ['-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-movflags', '+faststart']
+  : ['-c:v', 'libvpx-vp9', '-crf', '18', '-b:v', '0', '-row-mt', '1']
+execFileSync(bin, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', join(OUT, 'frames.txt'), '-vf', filters, ...codec, target], {
+  stdio: 'inherit',
+})
+rmSync(FRAMES, { recursive: true, force: true })
+rmSync(join(OUT, 'frames.txt'), { force: true })
+console.log(`Saved ${target} (${frames.length} frames${h264 ? '' : '; install ffmpeg for .mp4'})`)

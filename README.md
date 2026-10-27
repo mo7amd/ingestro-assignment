@@ -32,7 +32,7 @@ The generator is treated as a **black box**: the rules in the assignment are the
 | `npm run preview` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npm run generate` | Create `import-data.csv` |
-| `npm run demo` | Record a narrated walkthrough video to `demo/output/ingestro-demo.webm` using Playwright. Needs `import-data.csv`; starts its own server. |
+| `npm run demo` | Record the demo video (2560×1440) to `demo/output/ingestro-demo.mp4` using Playwright and ffmpeg (`brew install ffmpeg`; without it you get a `.webm`). Needs `import-data.csv` and Playwright's Chromium (`npx playwright install chromium`, once); starts its own server. Voice-over script: [demo/TRANSCRIPT.md](demo/TRANSCRIPT.md). |
 
 ## What you can do
 
@@ -53,7 +53,7 @@ The generator is treated as a **black box**: the rules in the assignment are the
 - A **Web Worker** owns the data. It parses the CSV in chunks (Papa Parse), stores it column by column, runs every check, and answers queries: filter, search, sort, rows for a window, fixes, undo. The page never holds all rows; it asks for the ~50 on screen.
 - The table is a **virtual grid** (`@tanstack/react-virtual`) with plain CSS cells. Chakra UI is used for the page shell.
 - **Validation is configuration.** `src/config/rules.json` declares the columns, the checks per column, and the plain-language text for every issue. A small generic engine (`src/domain/validate.ts`) interprets it.
-- Measured on the 200k-row file: load and check in about 0.9 s with no main-thread blocking; apply all automatic fixes (~88k cells) in about 0.15 s; sort all rows in about 1.7 s, inside the worker.
+- Measured on the 200k-row file: load and check in about 0.9 s (nothing blocks the page while reading; one short ~60–150 ms task when the result first renders); apply all automatic fixes (~88k cells) in about 0.13 s; sort all rows in about 1.7 s inside the worker, with a "Sorting…" indicator.
 
 Details, trade-offs and alternatives are in the [design document](docs/DESIGN.md).
 
@@ -78,7 +78,7 @@ src/
     fixes/                 review-and-apply dialog for bulk fixes
     history/               undo/redo
     export/                download the fixed file
-demo/                      Playwright script + stage page for the narrated demo
+demo/                      Playwright demo recorder + voice-over transcript
 docs/                      design document and decision log
 generate-data.mjs          data generator from the assignment (unchanged)
 ```

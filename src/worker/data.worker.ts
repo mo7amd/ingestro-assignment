@@ -497,17 +497,6 @@ function rowSlice(index: number, id: number): RowSlice {
   return slice
 }
 
-function getRowIdsForIssue(code: IssueCode): Uint32Array {
-  const ids = issueIndexByCode.get(code) ?? new Uint32Array(0)
-  const copy = ids.slice() // keep our index; transfer the copy
-  return Comlink.transfer(copy, [copy.buffer])
-}
-
-/** Rows sharing one value in a unique column, for "duplicate group" cards. */
-function getDuplicateGroups(column: Column): { value: string; rowIds: number[] }[] {
-  return [...(duplicateGroups.get(column) ?? [])].map(([value, rowIds]) => ({ value, rowIds }))
-}
-
 // ---------- changes ----------
 
 const COLUMN_INDEX = new Map(COLUMNS.map((c, i) => [c, i]))
@@ -613,11 +602,6 @@ function mergeRows(keep: number, others: number[], values: RowValues): HistorySt
   )
 }
 
-/** Duplicates: keep one row, remove the others (undoable). */
-function keepOnly(keep: number, others: number[]): HistoryState {
-  return record(`Kept row ${formatInt(keep + 1)}, removed ${others.map((r) => `row ${formatInt(r + 1)}`).join(', ')}`, [], others)
-}
-
 function getRowsByIds(ids: number[]): RowSlice[] {
   return ids.filter((id) => id < rowCount && !removed[id]).map((id, i) => rowSlice(i, id))
 }
@@ -715,13 +699,10 @@ const api = {
   getSummary,
   setView,
   getViewRows,
-  getRowIdsForIssue,
-  getDuplicateGroups,
   editCell,
   revertCell,
   fixRows,
   setCells,
-  keepOnly,
   getRowsByIds,
   getGroupRows,
   mergeRows,
