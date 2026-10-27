@@ -132,22 +132,56 @@ async function step() {
   await wait(READ)
 }
 
-/** Move the visible cursor (and the real mouse) to an element's centre. */
+/**
+ * The visible cursor lives inside the app frame, so it tilts and scales with the app.
+ * Clicks are dispatched inside the frame: Playwright's pointer coordinates don't follow the
+ * stage's 3D transform, so a real mouse click would land in the wrong place.
+ */
+let frame
+async function installCursor() {
+  frame = await (await page.$('#app')).contentFrame()
+  await frame.evaluate(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      #demo-cursor { position: fixed; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+        background: rgba(236,135,67,.22); border: 3px solid #ec8743; pointer-events: none; z-index: 2147483647;
+        transition: transform .45s cubic-bezier(.3,.7,.4,1); }
+      #demo-cursor.click { animation: demo-click .35s ease-out; }
+      @keyframes demo-click { 0% { box-shadow: 0 0 0 0 rgba(236,135,67,.6) } 100% { box-shadow: 0 0 0 24px rgba(236,135,67,0) } }`
+    document.head.append(style)
+    const c = document.createElement('div')
+    c.id = 'demo-cursor'
+    c.style.transform = 'translate(-100px, -100px)'
+    document.body.append(c)
+  })
+}
+
+/** Glide the visible cursor to an element's centre. */
 async function pointAt(locator) {
   await locator.scrollIntoViewIfNeeded()
-  const box = await locator.boundingBox()
-  if (!box) throw new Error('element not visible')
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-  await page.evaluate(([cx, cy]) => window.cursorTo(cx, cy), [x, y])
-  await page.mouse.move(x, y, { steps: 12 })
+  const { x, y } = await locator.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+  })
+  await frame.evaluate(([cx, cy]) => (document.getElementById('demo-cursor').style.transform = `translate(${cx}px, ${cy}px)`), [x, y])
   await wait(450)
 }
 
-async function click(locator, options = {}) {
+async function click(locator) {
   await pointAt(locator)
-  await page.evaluate(() => window.cursorClick())
-  await locator.click(options)
+  await frame.evaluate(() => {
+    const c = document.getElementById('demo-cursor')
+    c.classList.remove('click')
+    void c.offsetWidth
+    c.classList.add('click')
+  })
+  await locator.evaluate((el) => el.click())
+  await wait(BEAT)
+}
+
+async function dblclick(locator) {
+  await pointAt(locator)
+  await locator.evaluate((el) => el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))
   await wait(BEAT)
 }
 
@@ -165,6 +199,7 @@ const filterSelect = () => app.locator('select').first()
 try {
   await page.evaluate((src) => (document.getElementById('app').src = src), `${BASE}/dashboard`)
   await app.getByText('Drop your customer file here').waitFor()
+  await installCursor()
 
   await step() // situation
   await wait(LONG)
@@ -201,8 +236,7 @@ try {
   await filterSelect().selectOption({ value: 'DATE_NOT_REAL' })
   await rows().first().locator('.cell.issue').waitFor()
   const dateCell = rows().first().locator('.cell.issue')
-  await pointAt(dateCell)
-  await dateCell.dblclick()
+  await dblclick(dateCell)
   const editor = app.locator('.cell.editing input')
   await editor.press('ControlOrMeta+a')
   await type(editor, '2025-02-31')
@@ -239,6 +273,7 @@ try {
   await click(app.locator('.head .cell', { hasText: 'Monthly spend' }))
   await wait(BEAT)
   await click(rows().first().locator('.cell').nth(1))
+  await app.locator('.grid').focus()
   for (let i = 0; i < 4; i++) {
     await page.keyboard.press('Shift+ArrowDown')
     await wait(180)
@@ -256,7 +291,7 @@ try {
   await rows().first().waitFor()
   await wait(READ)
   const first = rows().first()
-  await pointAt(first.locator('.cell.issue'))
+  await click(first.locator('.cell.issue .value'))
   await click(first.getByRole('button', { name: 'Fix', exact: true }))
   const emailEditor = app.locator('.cell.editing input')
   await emailEditor.press('ControlOrMeta+a')
@@ -265,7 +300,7 @@ try {
   await emailEditor.press('Enter')
   await wait(READ)
   const karim = rows().filter({ hasText: 'C-0075639' })
-  await pointAt(karim.locator('.cell.issue'))
+  await click(karim.locator('.cell.issue .value'))
   await click(karim.getByRole('button', { name: 'Merge…' }))
   const merge = app.getByRole('dialog').filter({ hasText: 'Merge into one customer' })
   await merge.getByText('Result').waitFor()

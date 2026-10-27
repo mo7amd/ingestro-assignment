@@ -11,7 +11,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Decision:** A Web Worker streams the file in chunks with Papa Parse and posts progress back to the UI.
 - **Alternatives:** Parse on the main thread with `requestIdleCallback` slicing (slower, more complex), or use a backend (out of scope).
 
-## D2. The worker owns the data; the UI asks for the visible window — Proposed
+## D2. The worker owns the data; the UI asks for the visible window — Accepted (the ADR in DESIGN.md)
 - **Decision:** The worker holds the rows in columnar arrays, runs validation, and builds the issue index. It also runs search, sort and filter, and returns a `Uint32Array` view of row ids. The UI only requests the ~50 rows on screen.
 - **Why:** The main thread never touches 200k objects, and structured-clone cost stays small.
 - **Alternative:** Keep everything in React state. That's simpler, but every sort, filter or bulk fix would block scrolling.
@@ -30,7 +30,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Scope note:** This goes beyond the must-haves. Build it last, or cut it back to just "persist edits".
 - **Status:** Parked by the user ("circle back later, focus on the main user journey"). Everything currently lives in worker memory only: a reload loses the edits, and the CSV on disk is never modified. `idb` is installed but unused. Lighter option still open: persist only the edit log + file fingerprint, and replay it after the user re-picks the file.
 
-## D4. Grid: TanStack Virtual + Chakra UI — Proposed
+## D4. Grid: TanStack Virtual + Chakra UI — Accepted
 - **Context:** The user wants minimal frameworks but not hand-written CSS for everything. Chakra UI has no virtualized table.
 - **Decision:**
   - The grid is a custom grid on `@tanstack/react-virtual`: headless, about 10KB, and we fully control cell rendering for issue badges and inline editors.
@@ -48,7 +48,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   2. If time allows, add an `LLMSuggester` interface for the long tail of values our mappings can't resolve. It runs on **unique values**, not rows (e.g. ~50 odd country strings, not 200k rows), and its output goes through the same preview → apply → undo path.
   3. Otherwise, document it as future work.
 
-## D6. Ambiguous dates: infer the order from the file, show dates as words — Proposed
+## D6. Ambiguous dates: infer the order from the file — Accepted (the "converted from" label and the readable-date layer were not built)
 - **User idea:** Use each row's country to pick the order, MM/DD for US and DD/MM elsewhere, like a dependent validation.
 - **What the data shows:** 7,990 dates use slashes. In 4,545 of them the first part is greater than 12, and in none is the second part greater than 12. So the file is consistently **DD/MM/YYYY**, US rows included: 609 US rows are provably day-first. A country rule would have converted 440 US dates wrongly.
 - **Decision:**
@@ -58,10 +58,10 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   4. **Readable layer:** The grid and the editor show dates as `3 Apr 2024` next to the ISO value, so the user can spot a wrong month at a glance.
 - **Why:** Use evidence over heuristics; the country rule looked plausible but was wrong for this file.
 
-## D7. Verify with the generator's answer key — Accepted
+## D7. Verify with the generator's answer key — Done (results in DESIGN.md §7)
 - `node generate-data.mjs --report` also writes `issues-report.json`, which holds the generator's counts of injected issues. We don't read it while building. At the end we compare our issue counts against it and report the result in the AI note.
 
-## D8. Duplicates are resolved per group: fix, or keep one — Accepted (per-field merge: Deferred)
+## D8. Duplicates are resolved per group — Superseded by D23
 - **User direction:** Group the duplicate rows first. Then, per group, the user either **merges** them into one row or **fixes** the rows so they stop colliding.
 - **What the data shows:**
   - There are 2,917 email groups covering 5,879 rows: 2,872 pairs and 45 triples. No group is fully identical.
@@ -81,7 +81,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   - **Fix:** edit the email inline in the group card. The group dissolves live once it's unique.
 - **Assumption:** Emails are compared trimmed and case-insensitive.
 
-## D9. One generic bulk-fix engine: rule → preview → apply, with undo/redo — Proposed
+## D9. One generic bulk-fix engine — Partly built (preview → apply → undo/redo per issue and per selection; user-defined rules not built)
 - **User direction:** Bulk fixes should work on any column. The user defines a rule, sees a preview, then applies it. Redo must be supported.
 - **Rule model:** plain data, so the built-in suggestions and user rules share one engine.
   ```ts
@@ -106,7 +106,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   - A history panel lists actions in plain words ("Normalized 21 country spellings · 15,407 cells").
 - **Grounding:** The brief asks for one explained bulk fix. A generic engine costs little more *if* it stays this small data shape. We ship the country-name suggestion first and add the others only as prefilled rules.
 
-## D10. Changed cells: a marker plus undo on the cell, no hover — Accepted
+## D10. Changed cells: a marker plus undo on the cell, no hover — Accepted (as built: "Undo this cell" in the cell card adds a "Restored …" entry; ⌘Z is always the global undo)
 - **User direction:** No hover popovers, because they add clutter. Support undo directly on the cell.
 - **Decision:**
   - A changed cell shows only a subtle marker (a small corner dot).
@@ -123,13 +123,13 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Browse all:** the normal list, with search across all columns, sorting, and the default filters ("Rows with any problem", "Changed", per-column issue). Rules can be created here too, from a column header, starting unscoped.
 - One engine underneath: focus mode is just a preset filter plus a rule template.
 
-## D12. Jump to a problem: prev/next only — Proposed
+## D12. Jump to a problem: prev/next only — Accepted (prev/next now in the footer, D21)
 - The brief asks for "a way to jump to a problem". Clicking an issue jumps to its first row, and **prev / next** buttons move between affected rows ("Row 3 of 21,034").
 - **Dropped (my addition, not from the brief):**
   - **J/K keys:** a power-user pattern that doesn't suit non-technical users.
   - **Auto-advance after a fix:** it would move away from the cell before the user sees it turn valid, which works against the "immediate revalidation feedback" requirement.
 
-## D13. Field-aware search — Proposed
+## D13. Field-aware search — Accepted (typed `field:value` built; guided dropdown/chips not built)
 - **User direction:** Search should know about fields. The user types `field:"value"`, e.g. `country:"Deutschland"`.
 - **Decision:** One search box that accepts both forms.
   - **Typed:** `country:deutsch email:"@corp.example" smith`. The field terms and the free text are ANDed. Free text searches every column.
@@ -184,7 +184,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Deep links work:** if the data isn't loaded yet, the file picker shows, and after loading the app lands on the linked view.
 - **Not in the URL:** the selected row, which is momentary.
 
-## D17. Table — Accepted (first version)
+## D17. Table — Accepted (first version; its details panel is superseded by D21)
 - **Rows on demand:** the worker keeps the current view, i.e. filter → search → sort, as a `Uint32Array` of row ids. The table asks for pages of 200 rows around the visible window. Only about 30 rows are ever in the DOM.
 - **Grid:** `@tanstack/react-virtual` with plain CSS cells. Chakra components per cell would be too heavy while scrolling, so Chakra is used only for the toolbar and panel. Column widths are a display hint in rules.json.
 - **Focus mode:** the focused column is tinted, with the fix shown inline (`Polska → PL`). Other problem cells get only a dotted underline. A count badge per row shows how many problems it has.
@@ -198,7 +198,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   - jumping to the end of 200k rows: rows render immediately
 - **Dropped from cards:** the expand chevron. Cards are plain click targets, and the explanation lives in the table's details panel.
 
-## D18. Highlighting and the details panel follow the mode — Accepted
+## D18. Highlighting and the details panel follow the mode — Accepted (highlighting); panel superseded by D21
 - **Grid:**
   - **Focus mode:** only the issue in hand is highlighted (tinted, with the fix inline). Other problems aren't shown at all: no cell marks, and no per-row count badge (the column is removed).
   - **All rows / Problems:** every issue cell is highlighted.
@@ -208,7 +208,7 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
 - **Panel in browse mode:** all of the row's problems, at equal weight, each with its actions.
 - Leading and trailing spaces show as `·` in previews and the panel, so `" pro" → "pro"` doesn't look like a no-op.
 
-## D19. Fixing: cell edits, review-then-apply, undo/redo — Accepted
+## D19. Fixing: cell edits, review-then-apply, undo/redo — Accepted (panel parts superseded by D21; duplicate screens built in D23)
 - **Inline edit:**
   - Double-click a cell, or press **Edit** in the panel.
   - Every keystroke is checked in the worker with the same rules as the import, including duplicates. The cell border turns green or orange, and the panel says what's wrong in plain words, offering *Use "DE"* when a fix is known.
@@ -296,3 +296,17 @@ Status values: **Proposed** (open), **Accepted**, **Rejected**, **Deferred** (do
   - **Messages:** translation files.
 - **End users never edit rules.** They can save **mappings** ("Remember this: Holland → NL") from the bulk-fix review, plus confirmations like the date order. These are stored per customer and reused on the next import.
 - **Not built:** a schema editor, the "Remember this" option, and library-based country names.
+
+## D25. Warm Charcoal theme, with one meaning per color — Accepted
+- **User direction:** Adopt the Warm Charcoal palette (theme only).
+- **How:** `src/theme.ts` maps the palette onto Chakra's semantic tokens by role (`bg`, `fg`, `border`, color palettes). Components are unchanged.
+- **First pass felt unintuitive.** The orange accent also colored the "we can fix automatically" segment, right next to the amber "needs your decision". Two oranges read as two warnings. The `→ IT` suggestion (light orange) also blended into the amber problem tint.
+- **Fix: one meaning per color**
+  - **Green:** looks good.
+  - **Teal:** "we'll fix it" (the health-bar segment and the suggestion chip in a cell).
+  - **Amber:** a problem that needs a person (the cell tint and the health-bar segment).
+  - **Orange:** actions only (primary buttons, focus, current row), never status.
+  - **Red:** errors.
+  - "Download fixed file" became an outlined accent button rather than green: it's an action, not a status.
+- **Contrast measured** (WCAG): body text 11.3:1, secondary 5.0–5.6:1, the suggestion chip 7.5:1, dark text on orange buttons 6.9:1. The lowest is the icon grey at 4.6:1.
+- The demo stage uses the same palette.

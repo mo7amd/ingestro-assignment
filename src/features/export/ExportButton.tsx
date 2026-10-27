@@ -30,7 +30,7 @@ export function ExportButton({ summary, fileName }: { summary: Summary; fileName
 
   return (
     <>
-      <Button size="sm" colorPalette="green" loading={busy} onClick={() => (open > 0 ? setConfirming(true) : download())}>
+      <Button size="sm" variant="outline" colorPalette="blue" loading={busy} onClick={() => (open > 0 ? setConfirming(true) : download())}>
         Download fixed file
       </Button>
       {confirming && (

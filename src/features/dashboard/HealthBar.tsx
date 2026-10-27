@@ -3,9 +3,9 @@ import type { Summary } from '../../worker/client'
 import { formatCount, formatPercent } from '../format'
 
 const SEGMENTS = [
-  { key: 'rowsGood', label: 'Look good', color: 'green.500' },
-  { key: 'rowsAutoFixable', label: 'We can fix automatically', color: 'blue.500' },
-  { key: 'rowsManual', label: 'Need your decision', color: 'orange.500' },
+  { key: 'rowsGood', label: 'Look good', color: 'green.solid' },
+  { key: 'rowsAutoFixable', label: 'We can fix automatically', color: 'teal.solid' },
+  { key: 'rowsManual', label: 'Need your decision', color: 'orange.solid' },
 ] as const
 
 /** One bar, three colors: where the whole file stands, at a glance. */

@@ -85,4 +85,4 @@ generate-data.mjs          data generator from the assignment (unchanged)
 
 ## AI usage
 
-This project was built with an AI coding assistant (Claude). The decision log records the back-and-forth: what was proposed, what was changed or rejected, and how it was verified. The AI note itself belongs in the design document, where it is still to be written.
+This project was built with an AI coding assistant (Claude). The decision log records the back-and-forth: what was proposed, what was changed or rejected, and how it was verified. The AI note in the [design document](docs/DESIGN.md#7-ai-note) says what AI did, what was changed and how it was verified.

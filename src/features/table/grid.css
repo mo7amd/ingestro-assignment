@@ -15,8 +15,9 @@
 .cell.issue { background: var(--chakra-colors-orange-subtle); height: 100%; display: flex; align-items: center; gap: 6px; }
 .cell .value { overflow: hidden; text-overflow: ellipsis; }
 /* The suggested fix is a button: one click applies it. */
-.cell .fix { flex-shrink: 0; color: var(--chakra-colors-blue-fg); font-size: 12px; background: none; border: 0; padding: 1px 4px; border-radius: 4px; cursor: pointer; font-family: inherit; }
-.cell .fix:hover { background: var(--chakra-colors-blue-subtle); }
+/* Teal = "we can fix this", the same color as the overview bar; a chip, so it never blends into the amber problem tint. */
+.cell .fix { flex-shrink: 0; color: var(--chakra-colors-teal-fg); background: var(--chakra-colors-teal-subtle); font-size: 12px; border: 1px solid var(--chakra-colors-teal-muted); padding: 0 6px; border-radius: 4px; cursor: pointer; font-family: inherit; line-height: 18px; }
+.cell .fix:hover { background: var(--chakra-colors-teal-muted); border-color: var(--chakra-colors-teal-solid); }
 /* Changed by the user: a small corner dot (the details panel says what it was). */
 .cell { position: relative; display: flex; align-items: center; height: 100%; }
 .cell.num { justify-content: flex-end; }
